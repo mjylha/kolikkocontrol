@@ -3,18 +3,34 @@ using System.Text.RegularExpressions;
 
 namespace KolikkoControl.Web;
 
-public partial class Command(ILogger<Command> logger)
+public partial class Command(ILogger<Command> logger) : IDisposable
 {
-    private static readonly Regex ClearConsoleChars = ClearConsole();
-    private Process? process;
+    readonly object mutex = new();
+
+    static readonly Regex ClearConsoleChars = ClearConsole();
+    Process? process;
     public required string Wd { get; init; }
     public required string Exec { get; init; }
     public required string Args { get; init; }
 
-    private bool IsRunning { get; set; }
+    public bool IsRunning
+    {
+        get
+        {
+            try
+            {
+                return process != null;
+            }
+            catch (Exception e)
+            {
+                logger.LogInformation("Something went wrong"); //TODO remove me
+                throw;
+            }
+        }
+    }
 
-    private StreamWriter? output;
-    private StreamWriter? coloredOutput;
+    StreamWriter? output;
+    StreamWriter? coloredOutput;
 
     void StoreOutput(string? data)
     {
@@ -28,23 +44,29 @@ public partial class Command(ILogger<Command> logger)
         coloredOutput?.Flush();
     }
 
-    public void Handle(string status)
+    public Task Handle(bool shouldRun)
     {
-        var shouldRun = status.Trim() == "1";
-        if (shouldRun)
+        lock (mutex)
         {
-            if (IsRunning) return; // ok
-            Start();
+            if (shouldRun)
+            {
+                if (IsRunning) return Task.CompletedTask;
+                Start();
+            }
+            else
+            {
+                if (!IsRunning) return Task.CompletedTask;
+                Stop();
+            }
         }
-        else
-        {
-            if (!IsRunning) return; // ok
-            Stop();
-        }
+
+        return Task.CompletedTask;
     }
 
-    private void Start()
+    void Start()
     {
+        if (IsRunning) throw new InvalidOperationException($"{this} Already running");
+
         var app = "";
         if (!string.IsNullOrEmpty(Wd)) app += Wd + "/";
         app += Exec;
@@ -59,14 +81,14 @@ public partial class Command(ILogger<Command> logger)
         process.StartInfo.Arguments = Args;
         process.StartInfo.FileName = app;
         process.EnableRaisingEvents = true;
-        process.OutputDataReceived += (sender, args) => StoreOutput(args.Data);
-        process.Start();
+        process.OutputDataReceived += (_, args) => StoreOutput(args.Data);
+        var startStatus = process.Start();
+        if (!startStatus) throw new Exception("Process did not start");
         process.BeginOutputReadLine();
-        logger.LogInformation($"Started process {Exec} with id {process.Id}");
-        IsRunning = true;
+        logger.LogInformation("Started process {this}", ToString());
     }
 
-    private string InitLogPath(string extension)
+    string InitLogPath(string extension)
     {
         string logPath;
         if (!string.IsNullOrEmpty(Wd))
@@ -82,16 +104,34 @@ public partial class Command(ILogger<Command> logger)
         return logPath;
     }
 
-    private void Stop()
+    void Stop()
     {
-        logger.LogInformation($"Killing process {process?.Id}");
+        if (!IsRunning)
+        {
+            logger.LogInformation("Stop called for a not running process {this}", ToString());
+        }
+        else
+        {
+            logger.LogInformation("Killing process {this}", ToString());
+        }
+
         process?.Kill(true);
+        process?.Dispose();
         output?.Dispose();
+        coloredOutput?.Dispose();
         output = null;
-        IsRunning = false;
+        coloredOutput = null;
+        process = null;
     }
 
 
+    public override string ToString()
+    {
+        return Exec + " (" + (process?.Id.ToString() ?? "stopped") + ")";
+    }
+
     [GeneratedRegex(@"\x1B\[[^@-~]*[@-~]")]
     private static partial Regex ClearConsole();
+
+    public void Dispose() => Stop();
 }

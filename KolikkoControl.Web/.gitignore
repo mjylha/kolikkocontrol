@@ -5,3 +5,4 @@ obj
 *.log
 *.log.*
 *.colorlog.*
+/KolikkoControl.sln.DotSettings.user

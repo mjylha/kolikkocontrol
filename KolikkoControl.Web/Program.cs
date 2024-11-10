@@ -50,9 +50,6 @@ var port = Int32.Parse(app.Configuration["mqttport"] ?? throw new InvalidOperati
 var user = app.Configuration["mqttuser"];
 var password = app.Configuration["mqttpwd"];
 
-var logger = app.Services.GetRequiredService<ILogger<Command>>();
-var commands = CommandCollection.Init(app.Configuration, logger);
-
 var mqttFactory = new MqttFactory();
 var mqttClient = mqttFactory.CreateMqttClient();
 var mqttClientOptions = new MqttClientOptionsBuilder()
@@ -61,21 +58,25 @@ var mqttClientOptions = new MqttClientOptionsBuilder()
     .Build();
 
 
-mqttClient.ApplicationMessageReceivedAsync += e =>
+var logger = app.Services.GetRequiredService<ILogger<Command>>();
+var observer = new MqttStatusObserver(mqttClient);
+using var commands = CommandCollection.Init(app.Configuration, logger, observer);
+
+mqttClient.ApplicationMessageReceivedAsync += async e =>
 {
+    Console.WriteLine("Received application message.");
+    var payload = e.ApplicationMessage.PayloadSegment;
+    var value = Encoding.UTF8.GetString(payload);
     try
     {
-        Console.WriteLine("Received application message.");
-        var payload = e.ApplicationMessage.PayloadSegment;
-        var value = Encoding.UTF8.GetString(payload);
-        commands.Handle(value);
+        // ReSharper disable once AccessToDisposedClosure - should not cause too many problems...
+        await commands.Handle(value);
     }
     catch (Exception exception)
     {
-        Console.WriteLine($"Unhandled exception. Maybe next message will work. Nothing done. {exception}");
+        logger.LogError(exception, "Unhandled exception in message handling." +
+                                   "Message: {msg}. Topic: {topic}", value, e.ApplicationMessage.Topic);
     }
-
-    return Task.CompletedTask;
 };
 
 await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
