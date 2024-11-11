@@ -1,5 +1,6 @@
 using System.Text;
 using KolikkoControl.Web;
+using KolikkoControl.Web.Commands;
 using MQTTnet;
 using MQTTnet.Client;
 using Serilog;
@@ -58,15 +59,15 @@ var mqttClientOptions = new MqttClientOptionsBuilder()
     .Build();
 
 
-var logger = app.Services.GetRequiredService<ILogger<Command>>();
+var logger = app.Services.GetRequiredService<ILogger<GenericOsCommand>>();
 var observer = new MqttStatusObserver(mqttClient);
 using var commands = CommandCollection.Init(app.Configuration, logger, observer);
 
 mqttClient.ApplicationMessageReceivedAsync += async e =>
 {
-    Console.WriteLine("Received application message.");
     var payload = e.ApplicationMessage.PayloadSegment;
     var value = Encoding.UTF8.GetString(payload);
+    Console.WriteLine($"Received application message. {value}");
     try
     {
         // ReSharper disable once AccessToDisposedClosure - should not cause too many problems...
