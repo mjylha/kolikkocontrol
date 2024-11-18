@@ -6,30 +6,41 @@ public class CommandCollection(
     ILogger<GenericOsCommand> logger) : IDisposable
 {
     readonly IEnumerable<string> allowedStates = ["ON", "OFF"];
+    string message = "INIT";
+    string previousMessage = "INIT";
 
-    public static CommandCollection Init(
-        IConfiguration appConfiguration,
-        ILogger<GenericOsCommand> logger,
-        IStatusObserver observer)
+    public void Handle(string msg)
     {
-        return new CommandCollection(Parse(appConfiguration, logger, observer), observer, logger);
+        message = msg.Trim();
     }
 
-    public async Task Handle(string msg)
+    public async Task HandleAsync()
     {
-        if (!allowedStates.Contains(msg.Trim()))
+        if (commands.Count == 0) logger.LogError("No commands. We doing nothing.");
+
+        if (message == "INIT")
+        {
+            logger.LogInformation("No message received. Waiting for initializing...");
+            return;
+        }
+
+        var msg = message;
+        if (!allowedStates.Contains(msg))
         {
             await ReportBadState(msg);
             return;
         }
 
-        var shouldRun = msg.Trim() == "ON";
+        var shouldRun = msg == "ON";
         foreach (var cmd in commands)
         {
             await HandleMsg(cmd, shouldRun);
         }
 
-        await NotifyState();
+        if (message != previousMessage)
+            await NotifyState();
+
+        previousMessage = message;
     }
 
     async Task HandleMsg(Command cmd, bool shouldRun)
@@ -61,32 +72,20 @@ public class CommandCollection(
             await observer.HaveProblem("Process mismatch.");
     }
 
-    static List<Command> Parse(IConfiguration appConfiguration,
-        ILogger<GenericOsCommand> logger, IStatusObserver observer)
-    {
-        var conf1 = appConfiguration.GetSection("command1");
-        var conf2 = appConfiguration.GetSection("command2");
-        var first = ParseGeneric(logger, conf1);
-        var second = ParseGeneric(logger, conf2);
-        return [first, second];
-    }
-
-    static Command ParseGeneric(ILogger<GenericOsCommand> logger, IConfigurationSection conf)
-    {
-        return new GenericOsCommand(logger)
-        {
-            Wd = conf["wd"] ?? throw new InvalidOperationException(),
-            Exec = conf["exec"] ?? throw new InvalidOperationException(),
-            Args = conf["args"] ?? throw new InvalidOperationException(),
-            AvoidOfficeHours = conf["avoid-office-hours"] == "true"
-        };
-    }
-
     public void Dispose()
     {
         foreach (var command in commands)
         {
             command.Dispose();
+        }
+    }
+
+    public void LogStatus()
+    {
+        logger.LogInformation("{count} commands. Current state: {state}. Commands:", commands.Count, message);
+        foreach (var command in commands)
+        {
+            logger.LogInformation(command.ToString());
         }
     }
 }

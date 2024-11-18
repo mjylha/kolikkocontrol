@@ -1,19 +1,22 @@
+using System.Net;
 using System.Text;
 using KolikkoControl.Web;
 using KolikkoControl.Web.Commands;
+using KolikkoControl.Web.Configs;
 using MQTTnet;
 using MQTTnet.Client;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
-
+builder.Services.AddHostedService<CommandTimer>();
+builder.Services.AddSingleton<IStatusObserver, MqttStatusObserver>();
+builder.Services.AddSingleton<CommandCollection>();
+builder.Services.AddSingleton<List<Command>>(c =>
+    CommandParser.Parse(builder.Configuration, c.GetRequiredService<ILogger<GenericOsCommand>>()));
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -45,52 +48,61 @@ app.MapGet("/weatherforecast", () =>
     .WithName("GetWeatherForecast")
     .WithOpenApi();
 
-
-var serverIp = app.Configuration["mqttserver"];
-var port = Int32.Parse(app.Configuration["mqttport"] ?? throw new InvalidOperationException());
-var user = app.Configuration["mqttuser"];
-var password = app.Configuration["mqttpwd"];
+var serverIp = builder.Configuration["mqttserver"];
+var port = Int32.Parse(builder.Configuration["mqttport"] ?? throw new InvalidOperationException());
+var user = builder.Configuration["mqttuser"];
+var password = builder.Configuration["mqttpwd"];
 
 var mqttFactory = new MqttFactory();
 var mqttClient = mqttFactory.CreateMqttClient();
 var mqttClientOptions = new MqttClientOptionsBuilder()
     .WithTcpServer(serverIp, port)
     .WithCredentials(user, password)
+    .WithClientId(Dns.GetHostName())
     .Build();
 
 
 var logger = app.Services.GetRequiredService<ILogger<GenericOsCommand>>();
-var observer = new MqttStatusObserver(mqttClient);
-using var commands = CommandCollection.Init(app.Configuration, logger, observer);
+((MqttStatusObserver)app.Services.GetRequiredService<IStatusObserver>()).Init(mqttClient);
+var commands = app.Services.GetRequiredService<CommandCollection>();
 
-mqttClient.ApplicationMessageReceivedAsync += async e =>
+mqttClient.ApplicationMessageReceivedAsync += e =>
 {
     var payload = e.ApplicationMessage.PayloadSegment;
     var value = Encoding.UTF8.GetString(payload);
-    Console.WriteLine($"Received application message. {value}");
+    logger.LogDebug("Received application message. {value}", value);
     try
     {
-        // ReSharper disable once AccessToDisposedClosure - should not cause too many problems...
-        await commands.Handle(value);
+        // ReSharper disable once AccessToDisposedClosure
+        commands.Handle(value);
     }
     catch (Exception exception)
     {
         logger.LogError(exception, "Unhandled exception in message handling." +
                                    "Message: {msg}. Topic: {topic}", value, e.ApplicationMessage.Topic);
+        throw;
     }
+
+    return Task.CompletedTask;
 };
 
-await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
-
-var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
-    .WithTopicFilter(b => b.WithAtLeastOnceQoS().WithTopic("/kolikko1/heat"))
-    .Build();
-
-await mqttClient.SubscribeAsync(mqttSubscribeOptions, CancellationToken.None);
-
-Console.WriteLine("MQTT client subscribed to topic.");
-
+var mqttCancelSource = new CancellationTokenSource();
+try
+{
+    await mqttClient.ConnectAsync(mqttClientOptions, mqttCancelSource.Token);
+    var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
+        .WithTopicFilter(b => b.WithAtLeastOnceQoS().WithTopic("/kolikko1/heat"))
+        .Build();
+    await mqttClient.SubscribeAsync(mqttSubscribeOptions, mqttCancelSource.Token);
+    Console.WriteLine("MQTT client subscribed to topic.");
+}
+catch (Exception e)
+{
+    logger.LogError(e, "MQTT connect failed");
+    throw;
+}
 app.Run();
+mqttCancelSource.Cancel();
 
 record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {

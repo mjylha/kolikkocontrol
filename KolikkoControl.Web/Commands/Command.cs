@@ -24,21 +24,7 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
         coloredOutput?.Flush();
     }
 
-    public bool IsRunning
-    {
-        get
-        {
-            try
-            {
-                return Process != null;
-            }
-            catch (Exception e)
-            {
-                baseLogger.LogInformation("Something went wrong"); //TODO remove me
-                throw;
-            }
-        }
-    }
+    public bool IsRunning => Process != null;
 
     public abstract bool Enabled { get; }
     public abstract required string Exec { get; init; }
@@ -101,7 +87,8 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
 
     public override string ToString()
     {
-        return Exec + " (" + (Process?.Id.ToString() ?? "stopped") + ")";
+        var processorSecs = Process?.TotalProcessorTime.TotalSeconds ?? 0;
+        return Exec + " (" + (Process?.Id.ToString() ?? "stopped") + ", " + (int)processorSecs + ")";
     }
 
 
