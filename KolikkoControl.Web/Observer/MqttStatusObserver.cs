@@ -17,7 +17,6 @@ class MqttStatusObserver(ILogger<MqttStatusObserver> logger) : IStatusObserver
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/statusmsg", problem);
-        logger.LogDebug("Logged problem {p}", problem);
     }
 
     void AssertInitialized()
@@ -49,13 +48,11 @@ class MqttStatusObserver(ILogger<MqttStatusObserver> logger) : IStatusObserver
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/status", "ON");
-        logger.LogDebug("Logged ON");
     }
 
     public async Task NotRunning()
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/status", "OFF");
-        logger.LogDebug("Logged OFF");
     }
 }
