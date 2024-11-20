@@ -1,3 +1,5 @@
+using KolikkoControl.Web.Observer;
+
 namespace KolikkoControl.Web.Commands;
 
 public class CommandCollection(
@@ -7,7 +9,6 @@ public class CommandCollection(
 {
     readonly IEnumerable<string> allowedStates = ["ON", "OFF"];
     string message = "INIT";
-    string previousMessage = "INIT";
 
     public void Handle(string msg)
     {
@@ -37,10 +38,7 @@ public class CommandCollection(
             await HandleMsg(cmd, shouldRun);
         }
 
-        if (message != previousMessage)
-            await NotifyState();
-
-        previousMessage = message;
+        await NotifyState();
     }
 
     async Task HandleMsg(Command cmd, bool shouldRun)
@@ -66,10 +64,13 @@ public class CommandCollection(
         var enabledCommands = commands.Where(c => c.Enabled).ToArray();
         if (enabledCommands.All(c => c.IsRunning))
             await observer.Running();
-        if (enabledCommands.All(c => !c.IsRunning))
+        else if (enabledCommands.All(c => !c.IsRunning))
             await observer.NotRunning();
         else
+        {
+            await observer.Running(); // at least something is running
             await observer.HaveProblem("Process mismatch.");
+        }
     }
 
     public void Dispose()

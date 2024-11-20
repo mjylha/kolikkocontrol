@@ -11,6 +11,7 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
     readonly object mutex = new();
     StreamWriter? output;
     StreamWriter? coloredOutput;
+    bool disableLogged;
 
     protected void StoreOutput(string? data)
     {
@@ -55,7 +56,9 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
     {
         if (!Enabled)
         {
+            if (disableLogged) return;
             LogDisabled();
+            disableLogged = true;
             return;
         }
 
@@ -82,6 +85,7 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
         output = null;
         coloredOutput = null;
         Process = null;
+        disableLogged = false;
     }
 
 

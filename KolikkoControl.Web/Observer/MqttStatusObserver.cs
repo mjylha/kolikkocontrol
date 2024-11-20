@@ -1,20 +1,23 @@
 using MQTTnet.Client;
 
-namespace KolikkoControl.Web;
+namespace KolikkoControl.Web.Observer;
 
 class MqttStatusObserver(ILogger<MqttStatusObserver> logger) : IStatusObserver
 {
     IMqttClient? mqttClient;
+    MqttClientOptions? mqttClientOptions;
 
-    public void Init(IMqttClient m)
+    public void Init(IMqttClient m, MqttClientOptions o)
     {
         mqttClient = m;
+        mqttClientOptions = o;
     }
 
     public async Task HaveProblem(string problem)
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/statusmsg", problem);
+        logger.LogDebug("Logged problem {p}", problem);
     }
 
     void AssertInitialized()
@@ -30,15 +33,29 @@ class MqttStatusObserver(ILogger<MqttStatusObserver> logger) : IStatusObserver
         }
     }
 
+    public async Task Ping()
+    {
+        if (mqttClient is null) return; // cant ping yet
+        
+        if (!await mqttClient.TryPingAsync())
+        {
+            logger.LogInformation("Ping failed. Reconnecting... ");
+            await mqttClient.ConnectAsync(mqttClientOptions, CancellationToken.None);
+            logger.LogInformation("... connection re-establised.");
+        }
+    }
+
     public async Task Running()
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/status", "ON");
+        logger.LogDebug("Logged ON");
     }
 
     public async Task NotRunning()
     {
         AssertInitialized();
         await mqttClient.PublishStringAsync("/kolikko1/heat/status", "OFF");
+        logger.LogDebug("Logged OFF");
     }
 }

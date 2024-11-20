@@ -1,6 +1,4 @@
-using KolikkoControl.Web.Commands;
-
-namespace KolikkoControl.Web;
+namespace KolikkoControl.Web.Commands;
 
 public class CommandTimer(ILogger<CommandTimer> logger, CommandCollection commandCollection) : BackgroundService
 {

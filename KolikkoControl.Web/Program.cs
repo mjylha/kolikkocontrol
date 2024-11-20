@@ -3,6 +3,7 @@ using System.Text;
 using KolikkoControl.Web;
 using KolikkoControl.Web.Commands;
 using KolikkoControl.Web.Configs;
+using KolikkoControl.Web.Observer;
 using MQTTnet;
 using MQTTnet.Client;
 using Serilog;
@@ -13,13 +14,13 @@ builder.Services.AddSwaggerGen();
 builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 builder.Services.AddHostedService<CommandTimer>();
+builder.Services.AddHostedService<ObserverHeartbeat>();
 builder.Services.AddSingleton<IStatusObserver, MqttStatusObserver>();
 builder.Services.AddSingleton<CommandCollection>();
 builder.Services.AddSingleton<List<Command>>(c =>
     CommandParser.Parse(builder.Configuration, c.GetRequiredService<ILogger<GenericOsCommand>>()));
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -61,9 +62,8 @@ var mqttClientOptions = new MqttClientOptionsBuilder()
     .WithClientId(Dns.GetHostName())
     .Build();
 
-
 var logger = app.Services.GetRequiredService<ILogger<GenericOsCommand>>();
-((MqttStatusObserver)app.Services.GetRequiredService<IStatusObserver>()).Init(mqttClient);
+((MqttStatusObserver)app.Services.GetRequiredService<IStatusObserver>()).Init(mqttClient, mqttClientOptions);
 var commands = app.Services.GetRequiredService<CommandCollection>();
 
 mqttClient.ApplicationMessageReceivedAsync += e =>
@@ -86,25 +86,37 @@ mqttClient.ApplicationMessageReceivedAsync += e =>
     return Task.CompletedTask;
 };
 
+mqttClient.DisconnectedAsync += async e =>
+{
+    if (e.ClientWasConnected)
+    {
+        await mqttClient.ConnectAsync(mqttClient.Options);
+    }
+};
+
 var mqttCancelSource = new CancellationTokenSource();
 try
 {
-    await mqttClient.ConnectAsync(mqttClientOptions, mqttCancelSource.Token);
     var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
         .WithTopicFilter(b => b.WithAtLeastOnceQoS().WithTopic("/kolikko1/heat"))
         .Build();
+    await mqttClient.ConnectAsync(mqttClientOptions, mqttCancelSource.Token);
     await mqttClient.SubscribeAsync(mqttSubscribeOptions, mqttCancelSource.Token);
-    Console.WriteLine("MQTT client subscribed to topic.");
+    logger.LogDebug("MQTT client subscribed to topic.");
 }
 catch (Exception e)
 {
     logger.LogError(e, "MQTT connect failed");
     throw;
 }
+
 app.Run();
 mqttCancelSource.Cancel();
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+namespace KolikkoControl.Web
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+    {
+        public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    }
 }
