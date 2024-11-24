@@ -1,5 +1,10 @@
 namespace KolikkoControl.Web.Commands;
 
+/// <summary>
+/// Periodically calls <see cref="CommandCollection"/> to do its job.
+/// </summary>
+/// <param name="logger"></param>
+/// <param name="commandCollection"></param>
 public class CommandTimer(ILogger<CommandTimer> logger, CommandCollection commandCollection) : BackgroundService
 {
     bool initialized;
@@ -21,7 +26,7 @@ public class CommandTimer(ILogger<CommandTimer> logger, CommandCollection comman
 
             try
             {
-                await commandCollection.HandleAsync();
+                await commandCollection.UpdateAsync();
                 if (DateTime.Now - lastLogged >= TimeSpan.FromMinutes(30))
                 {
                     commandCollection.LogStatus();

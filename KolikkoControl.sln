@@ -2,6 +2,11 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KolikkoControl.Web", "KolikkoControl.Web\KolikkoControl.Web.csproj", "{1EA69F64-CC3C-4ADD-92B8-E4628C6DE53A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "rootdir", "rootdir", "{B224FAEE-C145-4D44-95C6-A22F062ED6FE}"
+	ProjectSection(SolutionItems) = preProject
+		readme.md = readme.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

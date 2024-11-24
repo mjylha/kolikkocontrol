@@ -31,20 +31,27 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
     public abstract required string Exec { get; init; }
     public required string Wd { get; init; }
 
-    public Task Handle(bool shouldRun)
+    public Task Update(bool shouldRun)
     {
-        lock (mutex)
+        try
         {
-            if (shouldRun)
+            lock (mutex)
             {
-                if (IsRunning) return Task.CompletedTask;
-                Start();
+                if (shouldRun)
+                {
+                    if (IsRunning) return Task.CompletedTask;
+                    Start();
+                }
+                else
+                {
+                    if (!IsRunning) return Task.CompletedTask;
+                    Stop();
+                }
             }
-            else
-            {
-                if (!IsRunning) return Task.CompletedTask;
-                Stop();
-            }
+        }
+        catch (Exception e)
+        {
+            baseLogger.LogError(e, "Unhandled error in {cmd}", ToString());
         }
 
         return Task.CompletedTask;

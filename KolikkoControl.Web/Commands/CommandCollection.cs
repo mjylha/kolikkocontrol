@@ -1,75 +1,49 @@
-using KolikkoControl.Web.Observer;
+using KolikkoControl.Web.Input;
+using KolikkoControl.Web.Output;
 
 namespace KolikkoControl.Web.Commands;
 
 public class CommandCollection(
     List<Command> commands,
-    IStatusObserver observer,
-    ILogger<GenericOsCommand> logger) : IDisposable
+    OutputBuffer outputBuffer,
+    ILogger<GenericOsCommand> logger,
+    InputBuffer inputBuffer
+) : IDisposable
 {
-    readonly IEnumerable<string> allowedStates = ["ON", "OFF"];
-    string message = "INIT";
-
-    public void Handle(string msg)
-    {
-        message = msg.Trim();
-    }
-
-    public async Task HandleAsync()
+    /// <summary>
+    /// Update command states according to state found in <see cref="InputBuffer"/>.
+    /// </summary>
+    public async Task UpdateAsync()
     {
         if (commands.Count == 0) logger.LogError("No commands. We doing nothing.");
 
-        if (message == "INIT")
+        var state = inputBuffer.State;
+        if (state.Equals(KolikkoState.Init))
         {
             logger.LogInformation("No message received. Waiting for initializing...");
             return;
         }
 
-        var msg = message;
-        if (!allowedStates.Contains(msg))
-        {
-            await ReportBadState(msg);
-            return;
-        }
-
-        var shouldRun = msg == "ON";
         foreach (var cmd in commands)
         {
-            await HandleMsg(cmd, shouldRun);
+            await cmd.Update(state.Equals(KolikkoState.On));
         }
 
-        await NotifyState();
+        NotifyState();
     }
 
-    async Task HandleMsg(Command cmd, bool shouldRun)
-    {
-        try
-        {
-            await cmd.Handle(shouldRun);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Unhandled error in {cmd}", cmd);
-        }
-    }
-
-    async Task ReportBadState(string msg)
-    {
-        logger.LogWarning("Unknown state {status}", msg);
-        await observer.HaveProblem($"Unknown state {msg}");
-    }
-
-    async Task NotifyState()
+    void NotifyState()
     {
         var enabledCommands = commands.Where(c => c.Enabled).ToArray();
         if (enabledCommands.All(c => c.IsRunning))
-            await observer.Running();
+            outputBuffer.Running(inputBuffer.State.ToString());
         else if (enabledCommands.All(c => !c.IsRunning))
-            await observer.NotRunning();
+            outputBuffer.NotRunning(inputBuffer.State.ToString());
         else
         {
-            await observer.Running(); // at least something is running
-            await observer.HaveProblem("Process mismatch.");
+            outputBuffer.Running(inputBuffer.State.ToString()); // at least something is running
+            logger.LogError("Strange state mismatch: status...");
+            LogStatus();
         }
     }
 
@@ -83,10 +57,9 @@ public class CommandCollection(
 
     public void LogStatus()
     {
-        logger.LogInformation("{count} commands. Current state: {state}. Commands:", commands.Count, message);
-        foreach (var command in commands)
-        {
-            logger.LogInformation(command.ToString());
-        }
+        var commandDescriptions = commands.Select(c => c.ToString()).Aggregate((a, b) => $"{a}\n{b}");
+        logger.LogDebug("{count} commands. Current state: {state}. Commands: \n{CommandText}", commands.Count,
+            inputBuffer.State,
+            commandDescriptions);
     }
 }
