@@ -18,20 +18,20 @@ HomeAssistant thermostat.
         | sub             | pub
     ┌─────────────────────▼────────┐  
     │  MqttService |   Publisher   │  Subscribes to thermostat's switch state topic, wites it to buffer (desired state).
-    │              |     Service   │  Publish Command states to status topic (the actual state at the moment).
+    │              |    Service    │  Publish Command states to status topic (the actual state at the moment).
     │------------------------------│
-    │  input       │  output       │  Hold desired state and the output state in separate buffers.
-    │   buffer     │   buffer      │  
+    │  Input       │  Output       │  Hold desired state and the output state in separate buffers.
+    │   Buffer     │   Buffer      │  
     │------------------------------│
-    │  Command Collection          │  Coordinates execution of multiple Commands. Reads desired state from input buffer  
+    │  CommandCollection           │  Coordinates execution of multiple Commands. Reads desired state from input buffer  
     │                              │  and publishes status to output buffer.
     │------------------------------│
     │  Command                     │  Individual processes. Support for 2 commands.
     └──────────────────────────────┘  
         | start           | kill
     ┌───▼─────────────────▼────────┐  
-    │   Process (OS)               │  
-    │   (Miner softwares)          │ 
+    │  Process (OS)                │  
+    │  (Miner softwares)           │ 
     │                              │ 
     └──────────────────────────────┘ 
 ```
@@ -41,7 +41,7 @@ HomeAssistant thermostat.
 * `/kolikko1/heat/status` KolikkoControl will publish it's state here, `ON` or `OFF`
 * `/kolikko1/heat` KolikkoControl receives `ON` or `OFF` commands.
 * `/kolikko1/heat/statusmsg` KolikkoControl might send some status info here
-* `/kolikko1/heat/command/hashrate` KolikkoControl will post hash rate in Kh/s (not implemented)
-* `/kolikko1/heat/command/accepted` KolikkoControl will post accepted share amount here (not implemented) 
+* `/kolikko1/heat/command/hashrate` KolikkoControl will post hash rate in Kh/s (not implemented, needs better design)
+* `/kolikko1/heat/command/accepted` KolikkoControl will post accepted share amount here (not implemented, ...) 
 
 

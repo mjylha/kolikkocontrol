@@ -33,7 +33,7 @@ public sealed class KolikkoState
 
     public static bool IsBadInput(string msg)
     {
-        return msg == On.code || msg == Off.code;
+        return !msg.Equals(On.code) && !msg.Equals(Off.code);
     }
 
     public static KolikkoState ParseInputStrict(string msg)

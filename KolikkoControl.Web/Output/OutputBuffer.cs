@@ -26,6 +26,7 @@ public class OutputBuffer
             Topic = "/kolikko1/heat/status",
             Text = "ON"
         };
+        error = null;
     }
 
     public void NotRunning(string msg)
@@ -35,6 +36,7 @@ public class OutputBuffer
             Topic = "/kolikko1/heat/status",
             Text = "OFF"
         };
+        error = null;
     }
 
     public Message? GetMessage()

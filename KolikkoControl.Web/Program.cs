@@ -13,7 +13,8 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration));
 builder.Services.AddHostedService<CommandTimer>();
 builder.Services.AddHostedService<MqttService>();
-builder.Services.AddTransient<IOutputPublisher>(c => c.GetRequiredService<MqttService>());
+builder.Services.AddSingleton<KolikkoMqttClient>();
+builder.Services.AddTransient<IOutputPublisher>(c => c.GetRequiredService<KolikkoMqttClient>());
 builder.Services.AddHostedService<PublisherService>();
 builder.Services.AddSingleton<InputBuffer>();
 builder.Services.AddSingleton<OutputBuffer>();

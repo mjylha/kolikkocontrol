@@ -3,29 +3,26 @@ using System.Text;
 using KolikkoControl.Web.Input;
 using MQTTnet;
 using MQTTnet.Client;
-using MQTTnet.Protocol;
 
 namespace KolikkoControl.Web.Mqtt;
 
 public class MqttService(
     ILogger<MqttService> logger,
     InputBuffer inputBuffer,
-    KolikkoMqttConfig config) : BackgroundService, IOutputPublisher
+    KolikkoMqttConfig config,
+    KolikkoMqttClient mqttClientWrapper) : BackgroundService
 {
     CancellationTokenSource? cancelSource;
-    IMqttClient? client;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         cancelSource = new CancellationTokenSource();
         var mqttFactory = new MqttFactory();
         var mqttClient = mqttFactory.CreateMqttClient();
-        client = mqttClient;
         var mqttClientOptions = CreateOptions();
         mqttClient.ApplicationMessageReceivedAsync += MessageReceived;
         await Subscribe(mqttFactory, mqttClient, mqttClientOptions, cancelSource);
-        // ((MqttStatusObserver)app.Services.GetRequiredService<IStatusObserver>()).Init(mqttClient, mqttClientOptions);
-
+        mqttClientWrapper.Init(mqttClient); // this dependency is ugly, but how else neatly init it?
         await PollConnection(mqttClient, mqttClientOptions, stoppingToken);
     }
 
@@ -106,22 +103,6 @@ public class MqttService(
     {
         cancelSource?.Cancel();
         return base.StopAsync(cancellationToken);
-    }
-
-    public async Task PublishAsync(string topic, string message, CancellationToken ct)
-    {
-        if (client is null)
-        {
-            throw new Exception("mqttClient is null");
-        }
-
-        if (!client.IsConnected)
-        {
-            throw new Exception("mqttClient is not connected");
-        }
-
-        await client.PublishStringAsync(topic, message, MqttQualityOfServiceLevel.AtLeastOnce,
-            cancellationToken: ct);
     }
 }
 

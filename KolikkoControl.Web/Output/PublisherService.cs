@@ -38,6 +38,7 @@ class PublisherService(ILogger<PublisherService> logger, OutputBuffer outputBuff
     async Task Publish(CancellationToken stoppingToken, OutputBuffer.Message msg)
     {
         await outputPublisher.PublishAsync(msg.Topic, msg.Text, stoppingToken);
-        logger.LogDebug("{topic}, {message}", msg.Topic, msg.Text);
+        
+        // logger.LogDebug("published {topic}, {message}", msg.Topic, msg.Text); 
     }
 }
