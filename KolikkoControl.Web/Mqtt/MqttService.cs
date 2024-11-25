@@ -12,21 +12,20 @@ public class MqttService(
     KolikkoMqttConfig config,
     KolikkoMqttClient mqttClientWrapper) : BackgroundService
 {
-    CancellationTokenSource? cancelSource;
+    readonly CancellationTokenSource cancelSource = new();
+    readonly MqttFactory mqttFactory = new();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        cancelSource = new CancellationTokenSource();
-        var mqttFactory = new MqttFactory();
         var mqttClient = mqttFactory.CreateMqttClient();
         var mqttClientOptions = CreateOptions();
         mqttClient.ApplicationMessageReceivedAsync += MessageReceived;
-        await Subscribe(mqttFactory, mqttClient, mqttClientOptions, cancelSource);
+        await Subscribe(mqttClient, mqttClientOptions, cancelSource);
         mqttClientWrapper.Init(mqttClient); // this dependency is ugly, but how else neatly init it?
         await PollConnection(mqttClient, mqttClientOptions, stoppingToken);
     }
 
-    async Task Subscribe(MqttFactory mqttFactory, IMqttClient mqttClient, MqttClientOptions mqttClientOptions,
+    async Task Subscribe(IMqttClient mqttClient, MqttClientOptions mqttClientOptions,
         CancellationTokenSource mqttCancelSource)
     {
         try
@@ -86,6 +85,7 @@ public class MqttService(
                 {
                     logger.LogInformation("Ping failed. Reconnecting... ");
                     await mqttClient.ConnectAsync(mqttClientOptions, stoppingToken);
+                    await Subscribe(mqttClient, CreateOptions(), cancelSource);
                     logger.LogInformation("... connection re-established.");
                 }
             }
@@ -101,7 +101,7 @@ public class MqttService(
 
     public override Task StopAsync(CancellationToken cancellationToken)
     {
-        cancelSource?.Cancel();
+        cancelSource.Cancel();
         return base.StopAsync(cancellationToken);
     }
 }
