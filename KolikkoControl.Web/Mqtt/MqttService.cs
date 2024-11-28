@@ -84,7 +84,6 @@ public class MqttService(
                 if (!await mqttClient.TryPingAsync(cancellationToken: stoppingToken))
                 {
                     logger.LogInformation("Ping failed. Reconnecting... ");
-                    await mqttClient.ConnectAsync(mqttClientOptions, stoppingToken);
                     await Subscribe(mqttClient, CreateOptions(), cancelSource);
                     logger.LogInformation("... connection re-established.");
                 }
