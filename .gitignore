@@ -2,3 +2,4 @@ appsettings.Development.json
 bin
 obj
 .idea
+*.DotSettings.user
