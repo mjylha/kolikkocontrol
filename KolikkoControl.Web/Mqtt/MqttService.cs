@@ -30,8 +30,9 @@ public class MqttService(
     {
         try
         {
+            var listenTopic = config.ListenTopic;
             var mqttSubscribeOptions = mqttFactory.CreateSubscribeOptionsBuilder()
-                .WithTopicFilter(b => b.WithAtLeastOnceQoS().WithTopic("/kolikko1/heat"))
+                .WithTopicFilter(b => b.WithAtLeastOnceQoS().WithTopic(listenTopic))
                 .Build();
             await mqttClient.ConnectAsync(mqttClientOptions, mqttCancelSource.Token);
             await mqttClient.SubscribeAsync(mqttSubscribeOptions, mqttCancelSource.Token);
@@ -51,6 +52,12 @@ public class MqttService(
         logger.LogDebug("Received application message. {value}", value);
         try
         {
+            if (config.AllowShutdown && KolikkoState.IsShutdown(value))
+            {
+                logger.LogWarning("Shutdown called, but it's not allowed.");
+                return Task.CompletedTask;
+            }
+            
             inputBuffer.Handle(value);
         }
         catch (Exception exception)
@@ -111,4 +118,6 @@ public class KolikkoMqttConfig
     public required int? Port { get; init; }
     public required string? Password { get; init; }
     public required string? User { get; init; }
+    public required string ListenTopic { get; init; }
+    public required bool AllowShutdown { get; init; }
 }

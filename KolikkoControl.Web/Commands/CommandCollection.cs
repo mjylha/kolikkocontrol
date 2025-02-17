@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using KolikkoControl.Web.Input;
 using KolikkoControl.Web.Output;
 
@@ -24,6 +25,12 @@ public class CommandCollection(
             return;
         }
 
+        if (state.Equals(KolikkoState.Shutdown))
+        {
+            logger.LogWarning("Received shutdown message. Powering off...");
+            Process.Start("shutdown", "-h now");            
+        }
+        
         foreach (var cmd in commands)
         {
             await cmd.Update(state.Equals(KolikkoState.On));

@@ -1,7 +1,13 @@
 namespace KolikkoControl.Web.Output;
 
-public class OutputBuffer
+public class OutputBuffer(OutputBuffer.OutputTopicConfig config)
 {
+    public class OutputTopicConfig
+    {
+        public required string ProblemTopic { get; init; }
+        public required string StatusOutputTopic { get; init; }
+    }
+
     Message? currentState;
     Message? error;
 
@@ -9,7 +15,7 @@ public class OutputBuffer
     {
         error = new Message
         {
-            Topic = "/kolikko1/heat/statusmsg",
+            Topic = config.ProblemTopic,
             Text = "BAD STATE: " + msg,
         };
     }
@@ -23,7 +29,7 @@ public class OutputBuffer
     {
         currentState = new Message
         {
-            Topic = "/kolikko1/heat/status",
+            Topic = config.StatusOutputTopic,
             Text = "ON"
         };
         error = null;
@@ -33,7 +39,7 @@ public class OutputBuffer
     {
         currentState = new Message
         {
-            Topic = "/kolikko1/heat/status",
+            Topic = config.StatusOutputTopic,
             Text = "OFF"
         };
         error = null;

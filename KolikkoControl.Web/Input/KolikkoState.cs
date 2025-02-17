@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace KolikkoControl.Web.Input;
 
 /// <summary>
@@ -15,6 +17,7 @@ public sealed class KolikkoState
     public static readonly KolikkoState Init = new("INIT");
     public static readonly KolikkoState Off = new("OFF");
     public static readonly KolikkoState On = new("ON");
+    public static readonly KolikkoState Shutdown = new("SHUTDOWN");
 
     public override bool Equals(object? obj)
     {
@@ -38,10 +41,20 @@ public sealed class KolikkoState
 
     public static KolikkoState ParseInputStrict(string msg)
     {
-        return msg == On.code
-            ? On
-            : msg == Off.code
-                ? Off
-                : throw new Exception("ASSERT FAILED BAD STATE" + msg);
+        if (msg == On.code)
+            return On;
+
+        if (msg == Off.code)
+            return Off;
+
+        if (msg == Shutdown.code)
+            return Shutdown;
+
+        throw new Exception("ASSERT FAILED BAD STATE" + msg);
+    }
+
+    public static bool IsShutdown(string value)
+    {
+        return value == Shutdown.code;
     }
 }

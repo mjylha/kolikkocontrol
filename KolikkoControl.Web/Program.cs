@@ -26,9 +26,15 @@ builder.Services.AddSingleton(new KolikkoMqttConfig
     Password = builder.Configuration["mqttpwd"],
     Port = int.Parse(builder.Configuration["mqttport"] ?? throw new InvalidOperationException()),
     User = builder.Configuration["mqttuser"],
-    ServerIp = builder.Configuration["mqttserver"] ?? throw new InvalidOperationException()
+    ServerIp = builder.Configuration["mqttserver"] ?? throw new InvalidOperationException(),
+    ListenTopic = builder.Configuration["listenTopic"] ?? "/kolikko1/heat",
+    AllowShutdown = builder.Configuration["allowShutdown"] == "true"
 });
-
+builder.Services.AddSingleton(new OutputBuffer.OutputTopicConfig
+{
+    ProblemTopic = builder.Configuration["problemOutputTopic"] ?? "/kolikko1/heat/statusmsg",
+    StatusOutputTopic = builder.Configuration["statusOutputTopic"] ?? "/kolikko1/heat/status"
+});
 
 var app = builder.Build();
 
