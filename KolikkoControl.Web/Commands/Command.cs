@@ -35,6 +35,7 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
     {
         try
         {
+            if (IsDisabled()) return Task.CompletedTask;
             lock (mutex)
             {
                 if (shouldRun)
@@ -55,6 +56,11 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
         }
 
         return Task.CompletedTask;
+    }
+
+    bool IsDisabled()
+    {
+        return string.IsNullOrEmpty(Exec);
     }
 
     protected abstract void LogDisabled();
@@ -98,8 +104,24 @@ public abstract partial class Command(ILogger<GenericOsCommand> baseLogger) : ID
 
     public override string ToString()
     {
-        var processorSecs = Process?.TotalProcessorTime.TotalSeconds ?? 0;
-        return Exec + " (" + (Process?.Id.ToString() ?? "stopped") + ", " + (int)processorSecs + ")";
+        double processorSecs = -1;
+        string processId;
+
+        if (Process == null)
+        {
+            processId = "un-initialized";
+        }
+        else if (Process.HasExited)
+        {
+            processId = "stopped";
+        }
+        else
+        {
+            processId = Process.Id.ToString();
+            processorSecs = Process.TotalProcessorTime.TotalSeconds;
+        }
+
+        return Exec + " (" + processId + ", " + (int)processorSecs + ")";
     }
 
 
